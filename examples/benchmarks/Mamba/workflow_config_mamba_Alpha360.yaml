@@ -1,0 +1,109 @@
+qlib_init:
+  provider_uri: "~/.qlib/qlib_data/cn_data"
+  region: cn
+
+market: &market csi300
+benchmark: &benchmark SH000300
+
+data_handler_config: &data_handler_config
+    start_time: 2008-01-01
+    # end_time: 2020-08-01
+    end_time: 2024-12-31
+    fit_start_time: 2008-01-01
+    # fit_end_time: 2014-12-31
+    fit_end_time: 2018-12-31
+    instruments: *market
+    infer_processors:
+        - class: FilterCol
+          kwargs:
+              fields_group: feature
+              col_list: ["RESI5", "WVMA5", "RSQR5", "KLEN", "RSQR10", "CORR5", "CORD5", "CORR10", 
+                            "ROC60", "RESI10", "VSTD5", "RSQR60", "CORR60", "WVMA60", "STD5", 
+                            "RSQR20", "CORD60", "CORD10", "CORR20", "KLOW"
+                        ]
+        - class: RobustZScoreNorm
+          kwargs:
+              fields_group: feature
+              clip_outlier: true
+        - class: Fillna
+          kwargs:
+              fields_group: feature
+    learn_processors:
+        - class: DropnaLabel
+        - class: CSRankNorm
+          kwargs:
+              fields_group: label
+    label: ["Ref($close, -2) / Ref($close, -1) - 1"]
+port_analysis_config: &port_analysis_config
+    strategy:
+        class: TopkDropoutStrategy
+        module_path: qlib.contrib.strategy
+        kwargs:
+            signal: <PRED>
+            topk: 50
+            n_drop: 5
+    backtest:
+        start_time: 2017-01-01
+        end_time: 2020-08-01
+        account: 100000000
+        benchmark: *benchmark
+        exchange_kwargs:
+            limit_threshold: 0.095
+            deal_price: close
+            open_cost: 0.0005
+            close_cost: 0.0015
+            min_cost: 5
+task:
+    model:
+        class: MambaModel
+        module_path: mamba
+        kwargs:
+            d_model: 20  # 模型维度，表示隐藏层的大小，范围[10-100]
+            n_layer: 2  # 模型层数，表示Mamba块的层数，范围[1-6]
+            d_lens: 20  # 序列长度，表示输入序列的长度，范围[10-100]
+            vocab_size: 8  # 词汇表大小，在时间序列预测中通常为1，范围[1-100]
+            d_state: 16  # 状态空间维度，表示SSM的状态维度，范围[4-32]
+            expand: 2  # 扩展因子，用于计算内部维度，范围[1-4]
+            dt_rank: 'auto'  # 时间步长秩，可选[auto, 1-10]
+            d_conv: 4  # 卷积核大小，范围[3-7]
+            pad_vocab_size_multiple: 1  # 词汇表大小的填充倍数，范围[1-8]
+            conv_bias: True  # 是否使用卷积偏置，布尔值
+            bias: False  # 是否使用线性层偏置，布尔值
+            lr: 0.00001  # 学习率，范围[0.00001-0.001]
+            metric: ""  # 评估指标，可选["", "mse", "mae"]
+            early_stop: 5  # 早停轮数，当验证集性能不再提升时停止训练，范围[3-10]
+            loss: "mse"  # 损失函数，可选["mse", "mae"]
+            optimizer: "adam"  # 优化器，可选["adam", "sgd"]
+            n_jobs: 20  # 数据加载的并行进程数，范围[1-32]
+            n_epochs: 100  # 训练轮数，范围[10-100]
+            batch_size: 800  # 批次大小，根据GPU内存调整，范围[32-2048]
+            GPU: 0  # 使用的GPU编号，范围[0-N]
+            seed: 2025  # 随机种子，任意整数
+    dataset:
+        class: TSDatasetH
+        module_path: qlib.data.dataset
+        kwargs:
+            handler:
+                class: Alpha158
+                module_path: qlib.contrib.data.handler
+                kwargs: *data_handler_config
+            segments:
+                train: [2008-01-01, 2014-12-31]
+                valid: [2015-01-01, 2016-12-31]
+                test: [2017-01-01, 2020-08-01]
+            step_len: 20
+    record: 
+        - class: SignalRecord
+          module_path: qlib.workflow.record_temp
+          kwargs: 
+            model: <MODEL>
+            dataset: <DATASET>
+        - class: SigAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs: 
+            ana_long_short: False
+            ann_scaler: 252
+        - class: PortAnaRecord
+          module_path: qlib.workflow.record_temp
+          kwargs: 
+            config: *port_analysis_config

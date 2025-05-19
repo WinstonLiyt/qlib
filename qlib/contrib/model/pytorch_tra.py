@@ -178,6 +178,12 @@ class TRAModel(Model):
         self.tra.train()
         data_set.train()
         self.optimizer.zero_grad()
+        
+        # Initialize memory tracking
+        if device != "cpu":
+            torch.cuda.reset_peak_memory_stats()
+            initial_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
+            self.logger.info(f"Initial GPU memory usage: {initial_memory:.2f} MB")
 
         P_all = []
         prob_all = []
@@ -250,6 +256,12 @@ class TRAModel(Model):
 
             total_loss += loss.item()
             total_count += 1
+            
+            # Log memory usage after each batch
+            if device != "cpu":
+                current_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
+                peak_memory = torch.cuda.max_memory_allocated() / 1024 / 1024  # Convert to MB
+                self.logger.info(f"Current GPU memory usage: {current_memory:.2f} MB, Peak: {peak_memory:.2f} MB")
 
         if self.use_daily_transport and len(P_all) > 0:
             P_all = pd.concat(P_all, axis=0)
@@ -279,13 +291,27 @@ class TRAModel(Model):
         probs = []
         P_all = []
         metrics = []
+        inference_times = []
+
         for batch in tqdm(data_set):
             data, state, label, count = batch["data"], batch["state"], batch["label"], batch["daily_count"]
             index = batch["daily_index"] if self.use_daily_transport else batch["index"]
 
             with torch.no_grad():
+                start_time = torch.cuda.Event(enable_timing=True)
+                end_time = torch.cuda.Event(enable_timing=True)
+                
+                start_time.record()
                 hidden = self.model(data)
                 all_preds, choice, prob = self.tra(hidden, state)
+                end_time.record()
+                
+                # Synchronize GPU
+                torch.cuda.synchronize()
+                
+                # Calculate inference time in milliseconds
+                inference_time = start_time.elapsed_time(end_time)
+                inference_times.append(inference_time)
 
             if is_pretrain or self.transport_method != "none":
                 loss, pred, L, P = self.transport_fn(
@@ -316,6 +342,9 @@ class TRAModel(Model):
                 if prob is not None:
                     columns = ["prob_%d" % d for d in range(all_preds.shape[1])]
                     probs.append(pd.DataFrame(prob.cpu().numpy(), index=index, columns=columns))
+
+        avg_inference_time = np.mean(inference_times)
+        self.logger.info(f"Average inference time per batch: {avg_inference_time:.4f} ms")
 
         metrics = pd.DataFrame(metrics)
         metrics = {

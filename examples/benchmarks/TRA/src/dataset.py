@@ -26,7 +26,7 @@ def _create_ts_slices(index, seq_len):
         index (pd.MultiIndex): pandas multiindex with <instrument, datetime> order
         seq_len (int): sequence length
     """
-    assert index.is_lexsorted(), "index should be sorted"
+    assert index.is_monotonic_increasing, "index should be sorted"
 
     # number of dates for each code
     sample_count_by_codes = pd.Series(0, index=index).groupby(level=0).size().values
@@ -118,8 +118,31 @@ class MTSDatasetH(DatasetH):
         df.index = df.index.swaplevel()
         df.sort_index(inplace=True)
 
-        self._data = df["feature"].values.astype("float32")
-        self._label = df["label"].squeeze().astype("float32")
+        # # 检查并打印原始数据中的NaN情况
+        # if df["feature"].isna().any().any():
+        #     self.logger.warning(f"Found {df['feature'].isna().sum().sum()} NaN values in features")
+        # if df["label"].isna().any().any():
+        #     self.logger.warning(f"Found {df['label'].isna().sum().sum()} NaN values in labels")
+
+        # 1. 处理特征数据中的NaN
+        # 对于特征，使用前向填充，如果还有NaN则用0填充
+        feature_data = df["feature"].values
+        for i in range(len(feature_data)):
+            if np.isnan(feature_data[i]).any():
+                if i > 0:  # 如果不是第一行，用前一行的值填充
+                    feature_data[i] = np.where(np.isnan(feature_data[i]), feature_data[i-1], feature_data[i])
+        feature_data = np.nan_to_num(feature_data, 0)  # 将剩余的NaN填充为0
+        
+        # 2. 处理标签数据中的NaN
+        label_data = df["label"].squeeze()
+        # 对于标签中的NaN，我们使用0填充并记录位置
+        label_is_nan = np.isnan(label_data)
+        if label_is_nan.any():
+            print(f"Replacing {label_is_nan.sum()} NaN labels with 0")
+            label_data = np.nan_to_num(label_data, 0)
+
+        self._data = feature_data.astype("float32")
+        self._label = label_data.astype("float32")
         self._index = df.index
 
         # add memory to feature
@@ -144,6 +167,12 @@ class MTSDatasetH(DatasetH):
         for i, (code, date) in enumerate(act_index):
             daily_slices[date].append(self.batch_slices[i])
         self.daily_slices = list(daily_slices.values())
+
+        # 最后检查处理后的数据是否还有NaN
+        if np.isnan(self._data).any():
+            print("Still found NaN in processed feature data!")
+        if np.isnan(self._label).any():
+            print("Still found NaN in processed label data!")
 
     def _prepare_seg(self, slc, **kwargs):
         fn = _get_date_parse_fn(self._index[0][1])

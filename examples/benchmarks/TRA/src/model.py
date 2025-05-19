@@ -96,6 +96,12 @@ class TRAModel(Model):
         self.tra.train()
 
         data_set.train()
+        
+        # Initialize memory tracking
+        if device != "cpu":
+            torch.cuda.reset_peak_memory_stats()
+            initial_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
+            self.logger.info(f"Initial GPU memory usage: {initial_memory:.2f} MB")
 
         max_steps = self.n_epochs
         if self.max_steps_per_epoch is not None:
@@ -112,14 +118,39 @@ class TRAModel(Model):
             self.global_step += 1
 
             data, label, index = batch["data"], batch["label"], batch["index"]
+            
+            # 检查输入数据是否有NaN
+            if torch.isnan(data).any():
+                self.logger.warning(f"Found NaN in input data at step {count}")
+                print("Data NaN count:", torch.isnan(data).sum().item())
+                
+            if torch.isnan(label).any():
+                self.logger.warning(f"Found NaN in labels at step {count}")
+                print("Label NaN count:", torch.isnan(label).sum().item())
 
             feature = data[:, :, : -self.tra.num_states]
             hist_loss = data[:, : -data_set.horizon, -self.tra.num_states :]
 
             hidden = self.model(feature)
+            
+            # 检查模型输出是否有NaN
+            if torch.isnan(hidden).any():
+                self.logger.warning(f"Found NaN in model output at step {count}")
+                print("Hidden NaN count:", torch.isnan(hidden).sum().item())
+                
             pred, all_preds, prob = self.tra(hidden, hist_loss)
+            
+            # 检查预测值是否有NaN
+            if torch.isnan(pred).any():
+                self.logger.warning(f"Found NaN in predictions at step {count}")
+                print("Pred NaN count:", torch.isnan(pred).sum().item())
 
             loss = (pred - label).pow(2).mean()
+            
+            # 检查损失值是否为NaN
+            if torch.isnan(loss).any():
+                self.logger.warning(f"Found NaN in loss at step {count}")
+                print("Loss value:", loss.item())
 
             L = (all_preds.detach() - label[:, None]).pow(2)
             L -= L.min(dim=-1, keepdim=True).values  # normalize & ensure positive input
@@ -138,6 +169,12 @@ class TRAModel(Model):
 
             total_loss += loss.item()
             total_count += len(pred)
+            
+            # Log memory usage after each batch
+            if device != "cpu":
+                current_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
+                peak_memory = torch.cuda.max_memory_allocated() / 1024 / 1024  # Convert to MB
+                self.logger.info(f"Current GPU memory usage: {current_memory:.2f} MB, Peak: {peak_memory:.2f} MB")
 
         total_loss /= total_count
 
@@ -150,6 +187,8 @@ class TRAModel(Model):
 
         preds = []
         metrics = []
+        inference_times = []
+
         for batch in tqdm(data_set):
             data, label, index = batch["data"], batch["label"], batch["index"]
 
@@ -157,8 +196,20 @@ class TRAModel(Model):
             hist_loss = data[:, : -data_set.horizon, -self.tra.num_states :]
 
             with torch.no_grad():
+                start_time = torch.cuda.Event(enable_timing=True)
+                end_time = torch.cuda.Event(enable_timing=True)
+                
+                start_time.record()
                 hidden = self.model(feature)
                 pred, all_preds, prob = self.tra(hidden, hist_loss)
+                end_time.record()
+                
+                # Synchronize GPU
+                torch.cuda.synchronize()
+                
+                # Calculate inference time in milliseconds
+                inference_time = start_time.elapsed_time(end_time)
+                inference_times.append(inference_time)
 
             L = (all_preds - label[:, None]).pow(2)
 
@@ -183,6 +234,9 @@ class TRAModel(Model):
 
             if return_pred:
                 preds.append(pred)
+
+        avg_inference_time = np.mean(inference_times)
+        self.logger.info(f"Average inference time per batch: {avg_inference_time:.4f} ms")
 
         metrics = pd.DataFrame(metrics)
         metrics = {
@@ -380,7 +434,7 @@ class LSTM(nn.Module):
         if self.training and self.noise_level > 0:
             noise = torch.randn_like(x).to(x)
             x = x + noise * self.noise_level
-
+        # print(x.shape)
         rnn_out, _ = self.rnn(x)
         last_out = rnn_out[:, -1]
 

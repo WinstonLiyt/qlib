@@ -154,6 +154,12 @@ class LSTM(Model):
         y_train_values = np.squeeze(y_train.values)
 
         self.lstm_model.train()
+        
+        # Initialize memory tracking
+        if self.use_gpu:
+            torch.cuda.reset_peak_memory_stats()
+            initial_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
+            self.logger.info(f"Initial GPU memory usage: {initial_memory:.2f} MB")
 
         indices = np.arange(len(x_train_values))
         np.random.shuffle(indices)
@@ -172,6 +178,12 @@ class LSTM(Model):
             loss.backward()
             torch.nn.utils.clip_grad_value_(self.lstm_model.parameters(), 3.0)
             self.train_optimizer.step()
+            
+            # Log memory usage after each batch
+            if self.use_gpu:
+                current_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
+                peak_memory = torch.cuda.max_memory_allocated() / 1024 / 1024  # Convert to MB
+                self.logger.info(f"Current GPU memory usage: {current_memory:.2f} MB, Peak: {peak_memory:.2f} MB")
 
     def test_epoch(self, data_x, data_y):
         # prepare training data
@@ -182,6 +194,7 @@ class LSTM(Model):
 
         scores = []
         losses = []
+        inference_times = []
 
         indices = np.arange(len(x_values))
 
@@ -192,13 +205,30 @@ class LSTM(Model):
             feature = torch.from_numpy(x_values[indices[i : i + self.batch_size]]).float().to(self.device)
             label = torch.from_numpy(y_values[indices[i : i + self.batch_size]]).float().to(self.device)
 
-            pred = self.lstm_model(feature)
-            loss = self.loss_fn(pred, label)
-            losses.append(loss.item())
+            with torch.no_grad():
+                start_time = torch.cuda.Event(enable_timing=True)
+                end_time = torch.cuda.Event(enable_timing=True)
+                
+                start_time.record()
+                pred = self.lstm_model(feature)
+                end_time.record()
+                
+                # Synchronize GPU
+                torch.cuda.synchronize()
+                
+                # Calculate inference time in milliseconds
+                inference_time = start_time.elapsed_time(end_time)
+                inference_times.append(inference_time)
+                
+                loss = self.loss_fn(pred, label)
+                losses.append(loss.item())
 
-            score = self.metric_fn(pred, label)
-            scores.append(score.item())
+                score = self.metric_fn(pred, label)
+                scores.append(score.item())
 
+        avg_inference_time = np.mean(inference_times)
+        self.logger.info(f"Average inference time per batch: {avg_inference_time:.4f} ms")
+        
         return np.mean(losses), np.mean(scores)
 
     def fit(

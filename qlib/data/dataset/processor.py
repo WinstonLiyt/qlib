@@ -184,6 +184,9 @@ class Fillna(Processor):
         self.fill_value = fill_value
 
     def __call__(self, df):
+        print("Fillna call")
+        print(df.shape)
+
         if self.fields_group is None:
             df.fillna(self.fill_value, inplace=True)
         else:
@@ -192,9 +195,10 @@ class Fillna(Processor):
             # df.fillna({col: self.fill_value for col in cols}, inplace=True)
 
             # So we use numpy to accelerate filling values
-            nan_select = np.isnan(df.values)
-            nan_select[:, ~df.columns.isin(cols)] = False
-            df.values[nan_select] = self.fill_value
+            # nan_select = np.isnan(df.values)
+            # nan_select[:, ~df.columns.isin(cols)] = False
+            # df.values[nan_select] = self.fill_value
+            df[self.fields_group] = df[self.fields_group].fillna(0)
         return df
 
 
@@ -284,6 +288,8 @@ class RobustZScoreNorm(Processor):
         self.clip_outlier = clip_outlier
 
     def fit(self, df: pd.DataFrame = None):
+        print("RobustZScoreNorm fit")
+        print(df.shape)
         df = fetch_df_by_index(df, slice(self.fit_start_time, self.fit_end_time), level="datetime")
         self.cols = get_group_columns(df, self.fields_group)
         X = df[self.cols].values

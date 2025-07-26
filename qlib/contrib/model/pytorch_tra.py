@@ -183,7 +183,7 @@ class TRAModel(Model):
         if device != "cpu":
             torch.cuda.reset_peak_memory_stats()
             initial_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
-            self.logger.info(f"Initial GPU memory usage: {initial_memory:.2f} MB")
+            # self.logger.info(f"Initial GPU memory usage: {initial_memory:.2f} MB")
 
         P_all = []
         prob_all = []
@@ -261,7 +261,7 @@ class TRAModel(Model):
             if device != "cpu":
                 current_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
                 peak_memory = torch.cuda.max_memory_allocated() / 1024 / 1024  # Convert to MB
-                self.logger.info(f"Current GPU memory usage: {current_memory:.2f} MB, Peak: {peak_memory:.2f} MB")
+                # self.logger.info(f"Current GPU memory usage: {current_memory:.2f} MB, Peak: {peak_memory:.2f} MB")
 
         if self.use_daily_transport and len(P_all) > 0:
             P_all = pd.concat(P_all, axis=0)
@@ -287,6 +287,10 @@ class TRAModel(Model):
         self.tra.eval()
         data_set.eval()
 
+        # Debug: check data_set length
+        dataset_len = len(data_set)
+        self.logger.info(f"Dataset length for {prefix}: {dataset_len}")
+
         preds = []
         probs = []
         P_all = []
@@ -298,20 +302,30 @@ class TRAModel(Model):
             index = batch["daily_index"] if self.use_daily_transport else batch["index"]
 
             with torch.no_grad():
-                start_time = torch.cuda.Event(enable_timing=True)
-                end_time = torch.cuda.Event(enable_timing=True)
-                
-                start_time.record()
-                hidden = self.model(data)
-                all_preds, choice, prob = self.tra(hidden, state)
-                end_time.record()
-                
-                # Synchronize GPU
-                torch.cuda.synchronize()
-                
-                # Calculate inference time in milliseconds
-                inference_time = start_time.elapsed_time(end_time)
-                inference_times.append(inference_time)
+                if device != "cpu":
+                    start_time = torch.cuda.Event(enable_timing=True)
+                    end_time = torch.cuda.Event(enable_timing=True)
+                    
+                    start_time.record()
+                    hidden = self.model(data)
+                    all_preds, choice, prob = self.tra(hidden, state)
+                    end_time.record()
+                    
+                    # Synchronize GPU
+                    torch.cuda.synchronize()
+                    
+                    # Calculate inference time in milliseconds
+                    inference_time = start_time.elapsed_time(end_time)
+                    inference_times.append(inference_time)
+                else:
+                    # CPU inference timing
+                    import time
+                    start_time = time.time()
+                    hidden = self.model(data)
+                    all_preds, choice, prob = self.tra(hidden, state)
+                    end_time = time.time()
+                    inference_time = (end_time - start_time) * 1000  # Convert to milliseconds
+                    inference_times.append(inference_time)
 
             if is_pretrain or self.transport_method != "none":
                 loss, pred, L, P = self.transport_fn(
@@ -343,26 +357,39 @@ class TRAModel(Model):
                     columns = ["prob_%d" % d for d in range(all_preds.shape[1])]
                     probs.append(pd.DataFrame(prob.cpu().numpy(), index=index, columns=columns))
 
-        avg_inference_time = np.mean(inference_times)
-        self.logger.info(f"Average inference time per batch: {avg_inference_time:.4f} ms")
+        avg_inference_time = np.mean(inference_times) if len(inference_times) > 0 else float('nan')
+        # self.logger.info(f"Average inference time per batch: {avg_inference_time:.4f} ms")
 
-        metrics = pd.DataFrame(metrics)
-        metrics = {
-            "MSE": metrics.MSE.mean(),
-            "MAE": metrics.MAE.mean(),
-            "IC": metrics.IC.mean(),
-            "ICIR": metrics.IC.mean() / metrics.IC.std(),
-        }
+        if len(metrics) > 0:
+            metrics = pd.DataFrame(metrics)
+            metrics = {
+                "MSE": metrics.MSE.mean(),
+                "MAE": metrics.MAE.mean(),
+                "IC": metrics.IC.mean(),
+                "ICIR": metrics.IC.mean() / metrics.IC.std(),
+            }
+        else:
+            # Handle case when no metrics are collected (e.g., empty dataset)
+            metrics = {
+                "MSE": float('nan'),
+                "MAE": float('nan'),
+                "IC": float('nan'),
+                "ICIR": float('nan'),
+            }
 
         if self._writer is not None and epoch >= 0 and not is_pretrain:
             for key, value in metrics.items():
                 self._writer.add_scalar(prefix + "/" + key, value, epoch)
 
         if return_pred:
-            preds = pd.concat(preds, axis=0)
-            preds.index = data_set.restore_index(preds.index)
-            preds.index = preds.index.swaplevel()
-            preds.sort_index(inplace=True)
+            if len(preds) > 0:
+                preds = pd.concat(preds, axis=0)
+                preds.index = data_set.restore_index(preds.index)
+                preds.index = preds.index.swaplevel()
+                preds.sort_index(inplace=True)
+            else:
+                # Create empty DataFrame with expected columns
+                preds = pd.DataFrame()
 
             if probs:
                 probs = pd.concat(probs, axis=0)
@@ -372,6 +399,8 @@ class TRAModel(Model):
                     probs.index = data_set.restore_index(probs.index)
                     probs.index = probs.index.swaplevel()
                     probs.sort_index(inplace=True)
+            else:
+                probs = []
 
             if len(P_all):
                 P_all = pd.concat(P_all, axis=0)
@@ -381,6 +410,13 @@ class TRAModel(Model):
                     P_all.index = data_set.restore_index(P_all.index)
                     P_all.index = P_all.index.swaplevel()
                     P_all.sort_index(inplace=True)
+            else:
+                P_all = []
+        else:
+            # When return_pred=False, return empty values
+            preds = pd.DataFrame()
+            probs = []
+            P_all = []
 
         return metrics, preds, probs, P_all
 
@@ -446,6 +482,11 @@ class TRAModel(Model):
         assert isinstance(dataset, MTSDatasetH), "TRAModel only supports `qlib.contrib.data.dataset.MTSDatasetH`"
 
         train_set, valid_set, test_set = dataset.prepare(["train", "valid", "test"])
+
+        # Debug: check dataset lengths
+        self.logger.info(f"Train set length: {len(train_set)}")
+        self.logger.info(f"Valid set length: {len(valid_set)}")
+        self.logger.info(f"Test set length: {len(test_set)}")
 
         self.fitted = True
         self.global_step = -1
@@ -761,6 +802,7 @@ def evaluate(pred):
     MSE = (diff**2).mean()
     MAE = (diff.abs()).mean()
     IC = score.corr(label, method="spearman")
+    # print(f"IC: {IC:.4f}, MSE: {MSE:.4f}, MAE: {MAE:.4f}")
     return {"MSE": MSE, "MAE": MAE, "IC": IC}
 
 

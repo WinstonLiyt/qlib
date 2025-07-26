@@ -98,10 +98,10 @@ class TRAModel(Model):
         data_set.train()
         
         # Initialize memory tracking
-        if device != "cpu":
-            torch.cuda.reset_peak_memory_stats()
-            initial_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
-            self.logger.info(f"Initial GPU memory usage: {initial_memory:.2f} MB")
+        # if device != "cpu":
+        #     torch.cuda.reset_peak_memory_stats()
+        #     initial_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
+        #     self.logger.info(f"Initial GPU memory usage: {initial_memory:.2f} MB")
 
         max_steps = self.n_epochs
         if self.max_steps_per_epoch is not None:
@@ -170,11 +170,11 @@ class TRAModel(Model):
             total_loss += loss.item()
             total_count += len(pred)
             
-            # Log memory usage after each batch
-            if device != "cpu":
-                current_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
-                peak_memory = torch.cuda.max_memory_allocated() / 1024 / 1024  # Convert to MB
-                self.logger.info(f"Current GPU memory usage: {current_memory:.2f} MB, Peak: {peak_memory:.2f} MB")
+            # # Log memory usage after each batch
+            # if device != "cpu":
+            #     current_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
+            #     peak_memory = torch.cuda.max_memory_allocated() / 1024 / 1024  # Convert to MB
+            #     self.logger.info(f"Current GPU memory usage: {current_memory:.2f} MB, Peak: {peak_memory:.2f} MB")
 
         total_loss /= total_count
 

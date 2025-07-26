@@ -1,14 +1,29 @@
 qlib_init:
-    provider_uri: "~/.qlib/qlib_data/cn_data"
+    provider_uri: "/home/v-yuanteli/RD-Agent/git_ignore_folder/quant_data"
     region: cn
 market: &market csi500
 benchmark: &benchmark SH000905
 data_handler_config: &data_handler_config
     start_time: 2008-01-01
-    end_time: 2020-08-01
+    end_time: 2025-06-30
     fit_start_time: 2008-01-01
-    fit_end_time: 2014-12-31
+    fit_end_time: 2021-12-31
     instruments: *market
+    infer_processors:
+        - class: RobustZScoreNorm
+          kwargs:
+              fields_group: feature
+              clip_outlier: true
+        - class: Fillna
+          kwargs:
+              fields_group: feature
+    learn_processors:
+        - class: DropnaLabel
+        - class: CSRankNorm
+          kwargs:
+              fields_group: label
+    label: ["Ref($close, -2) / Ref($close, -1) - 1"] 
+
 port_analysis_config: &port_analysis_config
     strategy:
         class: TopkDropoutStrategy
@@ -18,8 +33,8 @@ port_analysis_config: &port_analysis_config
             topk: 50
             n_drop: 5
     backtest:
-        start_time: 2017-01-01
-        end_time: 2020-08-01
+        start_time: 2024-01-01
+        end_time: 2025-06-30
         account: 100000000
         benchmark: *benchmark
         exchange_kwargs:
@@ -35,12 +50,12 @@ task:
         kwargs:
             loss: mse
             colsample_bytree: 0.9
-            learning_rate: 0.1
+            learning_rate: 0.05
             subsample: 0.9
             lambda_l1: 205.6999
             lambda_l2: 580.9768
-            max_depth: 8
-            num_leaves: 250
+            max_depth: 16
+            num_leaves: 500
             num_threads: 20
     dataset:
         class: DatasetH
@@ -51,9 +66,9 @@ task:
                 module_path: qlib.contrib.data.handler
                 kwargs: *data_handler_config
             segments:
-                train: [2008-01-01, 2014-12-31]
-                valid: [2015-01-01, 2016-12-31]
-                test: [2017-01-01, 2020-08-01]
+                train: [2008-01-01, 2021-12-31]
+                valid: [2022-01-01, 2023-12-31]
+                test: [2024-01-01, 2025-06-30]
     record: 
         - class: SignalRecord
           module_path: qlib.workflow.record_temp

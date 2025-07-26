@@ -198,7 +198,7 @@ class GATs(Model):
         if self.use_gpu:
             torch.cuda.reset_peak_memory_stats()
             initial_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
-            self.logger.info(f"Initial GPU memory usage: {initial_memory:.2f} MB")
+            # self.logger.info(f"Initial GPU memory usage: {initial_memory:.2f} MB")
 
         for data in data_loader:
             data = data.squeeze()
@@ -217,7 +217,7 @@ class GATs(Model):
             if self.use_gpu:
                 current_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
                 peak_memory = torch.cuda.max_memory_allocated() / 1024 / 1024  # Convert to MB
-                self.logger.info(f"Current GPU memory usage: {current_memory:.2f} MB, Peak: {peak_memory:.2f} MB")
+                # self.logger.info(f"Current GPU memory usage: {current_memory:.2f} MB, Peak: {peak_memory:.2f} MB")
 
     def test_epoch(self, data_loader):
         self.GAT_model.eval()
@@ -253,7 +253,7 @@ class GATs(Model):
                 scores.append(score.item())
 
         avg_inference_time = np.mean(inference_times)
-        self.logger.info(f"Average inference time per batch: {avg_inference_time:.4f} ms")
+        # self.logger.info(f"Average inference time per batch: {avg_inference_time:.4f} ms")
         
         return np.mean(losses), np.mean(scores)
 

@@ -171,6 +171,7 @@ class MTSDatasetH(DatasetH):
             df = self.handler._data.copy()
         df.index = df.index.swaplevel()
         df.sort_index(inplace=True)
+        print(df)
 
         # convert to numpy
         self._data = df["feature"].values.astype("float32")

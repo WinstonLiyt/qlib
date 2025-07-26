@@ -1,13 +1,14 @@
 qlib_init:
-    provider_uri: "~/.qlib/qlib_data/cn_data"
+    provider_uri: "/home/v-yuanteli/RD-Agent/git_ignore_folder/quant_data"
     region: cn
-market: &market csi300
-benchmark: &benchmark SH000300
+market: &market csi500
+benchmark: &benchmark SH000905
+
 data_handler_config: &data_handler_config
     start_time: 2008-01-01
-    end_time: 2020-08-01
+    end_time: 2025-06-30
     fit_start_time: 2008-01-01
-    fit_end_time: 2014-12-31
+    fit_end_time: 2021-12-31
     instruments: *market
     infer_processors:
         - class: FilterCol
@@ -39,8 +40,8 @@ port_analysis_config: &port_analysis_config
             topk: 50
             n_drop: 5
     backtest:
-        start_time: 2017-01-01
-        end_time: 2020-08-01
+        start_time: 2024-01-01
+        end_time: 2025-06-30
         account: 100000000
         benchmark: *benchmark
         exchange_kwargs:
@@ -57,14 +58,14 @@ task:
             d_feat: 20
             hidden_size: 64
             num_layers: 2
-            dropout: 0.7
-            n_epochs: 200
-            lr: 1e-4
-            early_stop: 10
+            dropout: 0.8
+            n_epochs: 400
+            lr: 1e-2
+            early_stop: 2
             metric: loss
             loss: mse
             base_model: LSTM
-            model_path: "benchmarks/LSTM/csi300_lstm_ts.pkl"
+            model_path: 
             GPU: 0
     dataset:
         class: TSDatasetH
@@ -75,9 +76,9 @@ task:
                 module_path: qlib.contrib.data.handler
                 kwargs: *data_handler_config
             segments:
-                train: [2008-01-01, 2014-12-31]
-                valid: [2015-01-01, 2016-12-31]
-                test: [2017-01-01, 2020-08-01]
+                train: [2008-01-01, 2021-12-31]
+                valid: [2022-01-01, 2023-12-31]
+                test: [2024-01-01, 2025-06-30]
             step_len: 20
     record: 
         - class: SignalRecord

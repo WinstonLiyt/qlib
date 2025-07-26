@@ -1,15 +1,15 @@
 qlib_init:
-  provider_uri: "~/.qlib/qlib_data/cn_data"
-  region: cn
+    provider_uri: "/home/v-yuanteli/RD-Agent/git_ignore_folder/quant_data"
+    region: cn
 
-market: &market csi300
-benchmark: &benchmark SH000300
+market: &market csi500
+benchmark: &benchmark SH000905
 
 data_handler_config: &data_handler_config
   start_time: 2008-01-01
-  end_time: 2020-08-01
+  end_time: 2025-06-30
   fit_start_time: 2008-01-01
-  fit_end_time: 2014-12-31
+  fit_end_time: 2021-12-31
   instruments: *market
   infer_processors:
     - class: FilterCol
@@ -26,6 +26,7 @@ data_handler_config: &data_handler_config
       kwargs:
         fields_group: feature
   learn_processors:
+    - class: DropnaLabel
     - class: CSRankNorm
       kwargs:
         fields_group: label
@@ -46,7 +47,7 @@ tra_config: &tra_config
 
 model_config: &model_config
   input_size: 20
-  hidden_size: 64
+  hidden_size: 32
   num_layers: 2
   rnn_arch: LSTM
   use_attn: True
@@ -61,8 +62,8 @@ port_analysis_config: &port_analysis_config
             topk: 50
             n_drop: 5
     backtest:
-        start_time: 2017-01-01
-        end_time: 2020-08-01
+        start_time: 2024-01-01
+        end_time: 2025-06-30
         account: 100000000
         benchmark: *benchmark
         exchange_kwargs:
@@ -83,7 +84,7 @@ task:
       lr: 1e-3
       n_epochs: 100
       max_steps_per_epoch:
-      early_stop: 20
+      early_stop: 3
       logdir: output/Alpha158
       seed: 0
       lamb: 1.0
@@ -106,11 +107,11 @@ task:
         module_path: qlib.contrib.data.handler
         kwargs: *data_handler_config
       segments:
-        train: [2008-01-01, 2014-12-31]
-        valid: [2015-01-01, 2016-12-31]
-        test: [2017-01-01, 2020-08-01]
-      seq_len: 60
-      horizon: 2
+        train: [2008-01-01, 2021-12-31]
+        valid: [2022-01-01, 2023-12-31]
+        test: [2024-01-01, 2025-06-30]
+      seq_len: 20
+      horizon: 1
       input_size:
       num_states: *num_states
       batch_size: 1024

@@ -1,13 +1,13 @@
 qlib_init:
-    provider_uri: "/home/v-yuanteli/RD-Agent/git_ignore_folder/quant_data"
-    region: cn
-market: &market csi500
-benchmark: &benchmark SH000905
+    provider_uri: "/home/v-yuanteli/qlib/.idea/us_data_fin_3"
+    region: us
+market: &market all
+benchmark: &benchmark ^NDX
 data_handler_config: &data_handler_config
     start_time: 2008-01-01
     end_time: 2025-06-30
     fit_start_time: 2008-01-01
-    fit_end_time: 2021-12-31
+    fit_end_time: 2014-12-31
     instruments: *market
     infer_processors:
         - class: FilterCol
@@ -55,11 +55,11 @@ task:
         module_path: qlib.contrib.model.xgboost
         kwargs:
             eval_metric: rmse
-            colsample_bytree: 0.8879
-            eta: 0.0421
-            max_depth: 8
-            n_estimators: 647
-            subsample: 0.8789
+            colsample_bytree: 0.7
+            eta: 0.02
+            max_depth: 5
+            n_estimators: 400
+            subsample: 0.7
             nthread: 20
     dataset:
         class: DatasetH
@@ -70,9 +70,9 @@ task:
                 module_path: qlib.contrib.data.handler
                 kwargs: *data_handler_config
             segments:
-                train: [2008-01-01, 2021-12-31]
-                valid: [2022-01-01, 2023-12-31]
-                test: [2024-01-01, 2025-06-30]
+                train: [2008-01-01, 2014-12-31]
+                valid: [2015-01-01, 2016-12-31]
+                test: [2017-01-01, 2025-06-30]
     record: 
         - class: SignalRecord
           module_path: qlib.workflow.record_temp

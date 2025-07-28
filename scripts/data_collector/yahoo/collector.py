@@ -396,12 +396,13 @@ class YahooNormalize(BaseNormalize):
         df.index = df.index.tz_localize(None)
         df = df[~df.index.duplicated(keep="first")]
         if calendar_list is not None:
+            # Convert all to tz-naive Timestamps
+            cal_index = pd.DatetimeIndex([pd.Timestamp(x).tz_localize(None) for x in calendar_list])
+            start_bound = max(pd.Timestamp(df.index.min()).tz_localize(None), cal_index.min())
+            end_bound = min(pd.Timestamp(df.index.max()).tz_localize(None) + pd.Timedelta(hours=23, minutes=59), cal_index.max())
             df = df.reindex(
-                pd.DataFrame(index=calendar_list)
-                .loc[
-                    pd.Timestamp(df.index.min()).date() : pd.Timestamp(df.index.max()).date()
-                    + pd.Timedelta(hours=23, minutes=59)
-                ]
+                pd.DataFrame(index=cal_index)
+                .loc[start_bound:end_bound]
                 .index
             )
         df.sort_index(inplace=True)

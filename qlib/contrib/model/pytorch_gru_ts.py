@@ -165,10 +165,10 @@ class GRU(Model):
         self.GRU_model.train()
         
         # Initialize memory tracking
-        if self.use_gpu:
-            torch.cuda.reset_peak_memory_stats()
-            initial_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
-            self.logger.info(f"Initial GPU memory usage: {initial_memory:.2f} MB")
+        # if self.use_gpu:
+            # torch.cuda.reset_peak_memory_stats()
+            # initial_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
+            # self.logger.info(f"Initial GPU memory usage: {initial_memory:.2f} MB")
 
         for data, weight in data_loader:
             feature = data[:, :, 0:-1].to(self.device)
@@ -183,10 +183,10 @@ class GRU(Model):
             self.train_optimizer.step()
             
             # Log memory usage after each batch
-            if self.use_gpu:
-                current_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
-                peak_memory = torch.cuda.max_memory_allocated() / 1024 / 1024  # Convert to MB
-                self.logger.info(f"Current GPU memory usage: {current_memory:.2f} MB, Peak: {peak_memory:.2f} MB")
+            # if self.use_gpu:
+            #     current_memory = torch.cuda.memory_allocated() / 1024 / 1024  # Convert to MB
+            #     peak_memory = torch.cuda.max_memory_allocated() / 1024 / 1024  # Convert to MB
+            #     self.logger.info(f"Current GPU memory usage: {current_memory:.2f} MB, Peak: {peak_memory:.2f} MB")
 
     def test_epoch(self, data_loader):
         self.GRU_model.eval()
@@ -221,7 +221,7 @@ class GRU(Model):
                 scores.append(score.item())
 
         avg_inference_time = np.mean(inference_times)
-        self.logger.info(f"Average inference time per batch: {avg_inference_time:.4f} ms")
+        # self.logger.info(f"Average inference time per batch: {avg_inference_time:.4f} ms")
         
         return np.mean(losses), np.mean(scores)
 

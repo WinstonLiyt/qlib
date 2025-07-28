@@ -315,7 +315,7 @@ def get_us_stock_symbols(qlib_data_path: [str, Path] = None) -> list:
         return _symbols
 
     if _US_SYMBOLS is None:
-        _all_symbols = _get_eastmoney() + _get_nasdaq() + _get_nyse()
+        _all_symbols = ['AAL', 'AAPL', 'ADBE', 'ADI', 'ADP', 'ADSK', 'ALGN', 'ALXN', 'AMAT', 'AMD', 'AMGN', 'AMZN', 'ANSS', 'ASML', 'ATVI', 'AVGO', 'BIDU', 'BIIB', 'BKNG', 'BMRN', 'CDNS', 'CDW', 'CERN', 'CHKP', 'CHTR', 'CMCSA', 'COST', 'CPRT', 'CSCO', 'CSGP', 'CSX', 'CTAS', 'CTSH', 'CTXS', 'DLTR', 'EA', 'EBAY', 'EXC', 'EXPE', 'FAST', 'FB', 'FISV', 'FOX', 'FOXA', 'GILD', 'GOOG', 'GOOGL', 'IDXX', 'ILMN', 'INCY', 'INTC', 'INTU', 'ISRG', 'JD', 'KHC', 'KLAC', 'LBTYA', 'LBTYK', 'LRCX', 'LULU', 'MAR', 'MCHP', 'MDLZ', 'MELI', 'MNST', 'MSFT', 'MU', 'MXIM', 'NFLX', 'NTAP', 'NTES', 'NVDA', 'NXPI', 'ORLY', 'PAYX', 'PCAR', 'PEP', 'PYPL', 'QCOM', 'REGN', 'ROST', 'SBUX', 'SGEN', 'SIRI', 'SNPS', 'SPLK', 'SWKS', 'TCOM', 'TMUS', 'TSLA', 'TTWO', 'TXN', 'UAL', 'ULTA', 'VRSK', 'VRSN', 'VRTX', 'WBA', 'WDAY', 'WDC', 'WLTW', 'XEL', 'XLNX', 'DXCM', 'ZM', 'DOCU', 'MRNA', 'PDD', 'KDP', 'AEP', 'MRVL', 'MTCH', 'OKTA', 'PTON', 'TEAM', 'HON', 'CRWD', 'ABNB', 'DDOG', 'FTNT', 'LCID', 'PANW', 'ZS', 'ODFL', 'CEG', 'AZN', 'META', 'ENPH', 'BKR', 'FANG', 'GFS', 'RIVN', 'WBD', 'GEHC', 'ON', 'TTD', '$SGEN$', 'CCEP', 'DASH', 'MDB', 'ROP', 'LIN', 'ARM', 'GRAL', 'SMCI', 'APP', 'AXON', 'MSTR', 'PLTR', 'SHOP', '$ANSS$']
         if qlib_data_path is not None:
             for _index in ["nasdaq100", "sp500"]:
                 ins_df = pd.read_csv(

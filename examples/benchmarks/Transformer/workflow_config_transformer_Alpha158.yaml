@@ -55,7 +55,7 @@ task:
         class: TransformerModel
         module_path: qlib.contrib.model.pytorch_transformer_ts
         kwargs:
-            seed: 0
+            seed: 2025
             n_jobs: 20
     dataset:
         class: TSDatasetH

@@ -1,8 +1,8 @@
 qlib_init:
-    provider_uri: "/home/v-yuanteli/RD-Agent/git_ignore_folder/quant_data"
-    region: cn
-market: &market csi500
-benchmark: &benchmark SH000905
+    provider_uri: "/home/v-yuanteli/qlib/.idea/us_data_fin_2"
+    region: us
+market: &market all
+benchmark: &benchmark ^NDX
 data_handler_config: &data_handler_config
     start_time: 2008-01-01
     end_time: 2025-06-30
@@ -58,10 +58,10 @@ task:
             d_feat: 20
             hidden_size: 64
             num_layers: 2
-            dropout: 0.0
-            n_epochs: 200
+            dropout: 0.8
+            n_epochs: 800
             lr: 2e-4
-            early_stop: 10
+            early_stop: 5
             batch_size: 800
             metric: loss
             loss: mse
